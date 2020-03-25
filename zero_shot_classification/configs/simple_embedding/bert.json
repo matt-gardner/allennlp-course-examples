@@ -1,10 +1,15 @@
 {
   "dataset_reader": {
     "type": "zero_shot_classification",
+    "tokenizer": {
+      "type": "pretrained_transformer",
+      "model_name": "bert-base-uncased"
+    },
     "token_indexers": {
       "tokens": {
-        "type": "single_id",
-        "token_min_padding_length": 4
+        "type": "pretrained_transformer",
+        "max_length": 512,
+        "model_name": "bert-base-uncased"
       }
     }
   },
@@ -15,19 +20,15 @@
     "embedder": {
       "token_embedders": {
         "tokens": {
-            "type": "embedding",
-            "pretrained_file": "https://allennlp.s3.amazonaws.com/datasets/glove/glove.6B.300d.txt.gz",
-            "embedding_dim": 300,
-            "trainable": false
+            "type": "pretrained_transformer",
+            "max_length": 512,
+            "model_name": "bert-base-uncased"
         }
       }
     },
     "encoder": {
-      "type": "cnn",
-      "num_filters": 300,
-      "ngram_filter_sizes": [2, 3, 4],
-      "output_dim": 300,
-      "embedding_dim": 300
+      "type": "cls_pooler",
+      "embedding_dim": 768
     }
   },
   "data_loader": {

@@ -1,4 +1,5 @@
-from typing import Dict
+from collections import defaultdict
+from typing import Dict, List
 
 import torch
 from allennlp.common.checks import check_dimensions_match
@@ -18,7 +19,9 @@ class EmbeddingZeroShotClassifier(Model):
         super().__init__(vocab)
         self.embedder = embedder
         self.encoder = encoder
+
         self.accuracy = CategoricalAccuracy()
+        self.labelwise_accuracy = defaultdict(lambda: CategoricalAccuracy())
 
         check_dimensions_match(self.embedder.get_output_dim(), self.encoder.get_output_dim(),
                                "embedder output", "encoder_output")
@@ -31,7 +34,8 @@ class EmbeddingZeroShotClassifier(Model):
     def forward(self,
                 text: Dict[str, torch.Tensor],
                 labels: Dict[str, torch.Tensor],
-                gold_label: torch.Tensor = None) -> Dict[str, torch.Tensor]:
+                gold_label: torch.Tensor = None,
+                accuracy_key: List[str] = None) -> Dict[str, torch.Tensor]:
         # Shape: (batch_size, num_tokens, embedding_dim)
         embedded_text = self.embedder(text)
 
@@ -68,9 +72,17 @@ class EmbeddingZeroShotClassifier(Model):
         # Shape: (1,)
         output = {'probs': probs}
         if gold_label is not None:
+            # IndexField gives a trailing dimension with length 1.
+            gold_label = gold_label.squeeze(-1)
             self.accuracy(logits, gold_label)
+            if accuracy_key:
+                for logit, label, key in zip(logits, gold_label, accuracy_key):
+                    self.labelwise_accuracy[key](logit.unsqueeze(0), label.unsqueeze(0))
             output['loss'] = torch.nn.functional.cross_entropy(logits, gold_label)
         return output
 
     def get_metrics(self, reset: bool = False) -> Dict[str, float]:
-        return {"accuracy": self.accuracy.get_metric(reset)}
+        metrics = {"accuracy": self.accuracy.get_metric(reset)}
+        for key in self.labelwise_accuracy:
+            metrics[f"_{key}_acc"] = self.labelwise_accuracy[key].get_metric(reset)
+        return metrics
